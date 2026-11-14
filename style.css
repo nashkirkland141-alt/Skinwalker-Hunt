@@ -1,0 +1,212 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Share+Tech+Mono&display=swap');
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #111812;
+  color: #e6e4d7;
+  font-family: 'Barlow Condensed', sans-serif;
+  overflow: hidden;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: linear-gradient(110deg, #080e0bdc, #1018109c);
+}
+
+.panel {
+  width: min(430px, 100%);
+  padding: 32px;
+  background: #111a14f5;
+  border: 1px solid #59694f;
+  box-shadow: 0 20px 80px #0009;
+}
+
+.tag {
+  font: 10px 'Share Tech Mono';
+  color: #a6b98a;
+  letter-spacing: 2px;
+}
+
+h1 {
+  font-size: 64px;
+  line-height: .78;
+  margin: 25px 0;
+  letter-spacing: 2px;
+}
+
+h1 span {
+  color: #a7b990;
+}
+
+.panel p {
+  color: #a9ad9e;
+  font-size: 17px;
+}
+
+input {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 13px;
+  background: #202a21;
+  color: white;
+  border: 1px solid #4c5948;
+  outline: none;
+  font: 15px 'Share Tech Mono';
+}
+
+input:focus {
+  border-color: #a7b990;
+}
+
+button {
+  width: 100%;
+  padding: 14px;
+  margin-top: 14px;
+  border: none;
+  background: #a7b990;
+  color: #10170f;
+  font: 800 18px 'Barlow Condensed';
+  letter-spacing: 2px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #d1dbbd;
+}
+
+button.secondary {
+  background: #29362b;
+  color: #d8ddce;
+}
+
+#authMessage, #lobbyMessage {
+  min-height: 18px;
+  font-size: 13px;
+  color: #df9a83;
+}
+
+#hud {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  text-shadow: 0 2px 5px black;
+}
+
+.topbar {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  justify-content: space-between;
+  font: 11px 'Share Tech Mono';
+}
+
+.sanity {
+  position: absolute;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(340px, 75vw);
+}
+
+.sanityText {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font: 11px 'Share Tech Mono';
+}
+
+#sanityNumber {
+  color: #b9d39b;
+}
+
+.sanityTrack {
+  height: 8px;
+  background: #171d17;
+  border: 1px solid #a9b59c66;
+}
+
+#sanityFill {
+  width: 100%;
+  height: 100%;
+  background: #a8c28e;
+  transition: width .3s;
+}
+
+#objective {
+  position: absolute;
+  top: 90px;
+  width: 100%;
+  text-align: center;
+  font-size: 17px;
+}
+
+#crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font: 24px monospace;
+}
+
+#weapon {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  font: 12px 'Share Tech Mono';
+}
+
+#controls {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font: 10px 'Share Tech Mono';
+  color: #bdc1ae;
+}
+
+#message {
+  position: absolute;
+  top: 28%;
+  width: 100%;
+  text-align: center;
+  font-size: 25px;
+  color: #eee8d0;
+  opacity: 0;
+  transition: opacity .3s;
+}
+
+@media(max-width:600px) {
+  h1 { font-size: 52px; }
+  .panel { padding: 23px; }
+  #controls { font-size: 8px; }
+}
