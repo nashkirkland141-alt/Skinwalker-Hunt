@@ -1,117 +1,786 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
-// Skinwalker: The Hunt | client prototype
-const SUPABASE_URL = 'https://twsyqidzbgwidjnffhfb.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_jkNeW0TBQTZ8VcEAudYAbw_xOt5ZVuQ';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+
+// ===========================================
+// CONFIGURATION
+// ===========================================
+
+const SUPABASE_URL = "https://twsyqidzbgwidjnffhfb.supabase.co";
+const SUPABASE_KEY = "sb_publishable_jkNeW0TBQTZ8VcEAudYAbw_xOt5ZVuQ";
+
+const ASSETS = {
+  forest: "./assets/forest.glb",
+  deer: "./assets/low_poly_deer_elk.glb",
+  wendigo: "./assets/wendigo.glb"
+};
+
+const supabase = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
 const $ = id => document.getElementById(id);
-let user=null, channel=null, room='FOREST', playerName='Ranger', myRole='hunter';
-let sanity=100, joinedAt=Date.now(), lastMove=0, lastShot=0, messageTimer=0;
-const remoteModels={}, remotePositions={}, wildlife=[], keys={};
-const caughtPlayers=new Set();
-const loader=new GLTFLoader();
-let deerTemplate=null, wendigoTemplate=null, wendigo=null, wendigoActive=false;
-let yaw=0,pitch=0,locked=false, gameStarted=false, sanityElapsed=0;
-let moveX=0,moveY=0,joyPointer=null,lookPointer=null,lastTouchX=0,lastTouchY=0;
 
-// ---------- AUTH ----------
-function authMessage(message,isError=false){$('authMessage').textContent=message;$('authMessage').style.color=isError?'#df9a83':'#a9bc91';}
-$('signup').onclick=async()=>{
-  const email=$('email').value.trim(), password=$('password').value;
-  if(!email||password.length<6){authMessage('Enter a valid email and a password with at least 6 characters.',true);return;}
-  $('signup').disabled=true;
-  const username=(email.split('@')[0]||'Ranger').slice(0,16);
-  const {error}=await supabase.auth.signUp({email,password,options:{data:{username}}});
-  $('signup').disabled=false;
-  if(error){authMessage(error.message,true);return;}
-  authMessage('Verification email sent. Check your inbox, then sign in.');
+let user = null;
+let channel = null;
+let room = "";
+let role = "waiting";
+let joinedAt = Date.now();
+
+let scene, camera, renderer, clock;
+let deerTemplate = null;
+let wendigoTemplate = null;
+let wendigoInstance = null;
+
+let sanity = 100;
+let running = false;
+let yaw = 0;
+let pitch = 0;
+let lastSend = 0;
+let sanityTimer = 0;
+let mobileMove = { x: 0, y: 0 };
+
+const keys = {};
+const players = new Map();
+const animals = [];
+
+const loader = new GLTFLoader();
+const raycaster = new THREE.Raycaster();
+
+function say(id, text) {
+  $(id).textContent = text;
+}
+
+function notify(text) {
+  say("message", text);
+  clearTimeout(notify.timer);
+  notify.timer = setTimeout(() => say("message", ""), 1800);
+}
+
+// ===========================================
+// AUTHENTICATION
+// ===========================================
+
+$("signup").onclick = async () => {
+  const email = $("email").value.trim();
+  const password = $("password").value;
+
+  if (!email || password.length < 6) {
+    say("authMessage", "Enter a valid email and a password of at least 6 characters.");
+    return;
+  }
+
+  $("signup").disabled = true;
+  say("authMessage", "Creating account...");
+
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: location.origin
+      }
+    });
+
+    if (error) throw error;
+
+    if (data.session) {
+      user = data.user;
+      openLobby();
+    } else {
+      say("authMessage", "Account created. Check your email to verify it, then log in.");
+    }
+  } catch (error) {
+    say("authMessage", error.message);
+  } finally {
+    $("signup").disabled = false;
+  }
 };
-$('signin').onclick=async()=>{
-  const email=$('email').value.trim(),password=$('password').value;
-  if(!email||!password){authMessage('Enter your email and password.',true);return;}
-  $('signin').disabled=true;
-  const {data,error}=await supabase.auth.signInWithPassword({email,password});
-  $('signin').disabled=false;
-  if(error){authMessage(error.message,true);return;}
-  user=data.user; showLobby();
+
+$("login").onclick = async () => {
+  const email = $("email").value.trim();
+  const password = $("password").value;
+
+  if (!email || !password) {
+    say("authMessage", "Enter your email and password.");
+    return;
+  }
+
+  $("login").disabled = true;
+  say("authMessage", "Logging in...");
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) throw error;
+
+    user = data.user;
+    openLobby();
+  } catch (error) {
+    say("authMessage", error.message);
+  } finally {
+    $("login").disabled = false;
+  }
 };
-$('logout').onclick=async()=>{await supabase.auth.signOut();location.reload();};
-$('returnMenu').onclick=async()=>{if(channel)await supabase.removeChannel(channel);location.reload();};
-function showLobby(){ $('login').classList.add('hidden');$('lobby').classList.remove('hidden'); }
-async function restoreSession(){const {data}=await supabase.auth.getSession();if(data.session){user=data.session.user;showLobby();}}
-restoreSession();
 
-// ---------- THREE.JS WORLD ----------
-const scene=new THREE.Scene();
-const baseFog=0x859087;scene.background=new THREE.Color(baseFog);scene.fog=new THREE.FogExp2(baseFog,.009);
-const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,450);camera.position.set(0,1.7,10);
-const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
-renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-renderer.outputColorSpace=THREE.SRGBColorSpace;$('game').appendChild(renderer.domElement);camera.add(new THREE.Group());scene.add(camera);
-scene.add(new THREE.HemisphereLight(0xc7d3d0,0x293326,1.8));
-const sun=new THREE.DirectionalLight(0xffe4bb,1.7);sun.position.set(-40,70,35);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
-const mat=(color,extra={})=>new THREE.MeshStandardMaterial({color,flatShading:true,...extra});
-const M={ground:mat(0x46513a),trunk:mat(0x493729),leaves:mat(0x263d2c),leaves2:mat(0x354c34),road:mat(0x655e4c),cabin:mat(0x544333),roof:mat(0x292c29),black:mat(0x191b18),window:mat(0x9aa77e,{emissive:0x323c20})};
-function addBox(w,h,d,material,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m;}
-function addTree(x,z,h){const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.35,.6,h,6),M.trunk);trunk.position.set(x,h/2,z);trunk.castShadow=true;scene.add(trunk);const leaves=new THREE.Mesh(new THREE.ConeGeometry(3,h*.8,6),M.leaves);leaves.position.set(x,h*.85,z);leaves.castShadow=true;scene.add(leaves);const upper=new THREE.Mesh(new THREE.ConeGeometry(2.2,h*.6,6),M.leaves2);upper.position.set(x,h*1.15,z);scene.add(upper);}
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(400,400),M.ground);ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
-addBox(11,.08,250,M.road,20,.04,0);addBox(140,.08,9,M.road,-40,.04,-35);
-function makeCabin(x,z){addBox(9,4,8,M.cabin,x,2,z);const roof=new THREE.Mesh(new THREE.ConeGeometry(7,3,4),M.roof);roof.position.set(x,5,z);roof.rotation.y=Math.PI/4;scene.add(roof);addBox(1.2,2,.15,M.black,x,1,z+4.1);addBox(1.1,1.2,.12,M.window,x+3,2.4,z+4.1);}
-makeCabin(-30,-35);makeCabin(-70,15);makeCabin(70,-70);makeCabin(65,70);
-let seed=7823;function random(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
-for(let i=0;i<430;i++){const x=(random()-.5)*330,z=(random()-.5)*330;if(Math.hypot(x,z)<17||Math.abs(x-20)<9)continue;addTree(x,z,6+random()*8);}
+$("logout").onclick = async () => {
+  await supabase.auth.signOut();
+  user = null;
+  $("lobby").classList.add("hidden");
+  $("auth").classList.remove("hidden");
+};
 
-// ---------- REAL GLB MODELS ----------
-function normalizeModel(root,targetHeight){
-  root.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(root);const size=box.getSize(new THREE.Vector3());
-  if(size.y>0){const s=targetHeight/size.y;root.scale.multiplyScalar(s);}
-  root.updateMatrixWorld(true);const fitted=new THREE.Box3().setFromObject(root);const center=fitted.getCenter(new THREE.Vector3());
-  root.position.x-=center.x;root.position.z-=center.z;root.position.y-=fitted.min.y;
-  root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){o.material.side=THREE.DoubleSide;}}});
-  return root;
+const session = await supabase.auth.getSession();
+
+if (session.data.session) {
+  user = session.data.session.user;
+  openLobby();
 }
-function cloneModel(template){return template.clone(true);}
-async function loadModels(){
-  try{const gltf=await loader.loadAsync('./models/deer.glb');deerTemplate=normalizeModel(gltf.scene,2.45);}
-  catch(e){console.error('Could not load deer.glb',e);}
-  try{const gltf=await loader.loadAsync('./models/wendigo.glb');wendigoTemplate=normalizeModel(gltf.scene,3.35);}
-  catch(e){console.error('Could not load wendigo.glb',e);}
-  if(!deerTemplate)deerTemplate=createFallbackDeer();
-  if(!wendigoTemplate)wendigoTemplate=createFallbackWendigo();
-  spawnWildlife();
-}
-function createFallbackDeer(){const g=new THREE.Group(),m=mat(0x97724d);const body=new THREE.Mesh(new THREE.BoxGeometry(.7,.65,1.3),m);body.position.y=1.2;g.add(body);const head=new THREE.Mesh(new THREE.BoxGeometry(.35,.45,.4),m);head.position.set(0,2,-.65);g.add(head);return g;}
-function createFallbackWendigo(){const g=new THREE.Group(),m=mat(0xaaa18b);const body=new THREE.Mesh(new THREE.BoxGeometry(.65,1.7,.4),m);body.position.y=1.2;g.add(body);const head=new THREE.Mesh(new THREE.SphereGeometry(.25,8,8),m);head.position.y=2.3;g.add(head);return g;}
-function createDeer(){return cloneModel(deerTemplate||createFallbackDeer());}
-function spawnWildlife(){if(wildlife.length)return;for(let i=0;i<15;i++){const mesh=createDeer(),x=(random()-.5)*100+35,z=(random()-.5)*100;mesh.position.set(x,0,z);mesh.rotation.y=random()*Math.PI*2;scene.add(mesh);wildlife.push({mesh,x,z,phase:random()*10,kind:'ai'});}}
-loadModels();
 
-// ---------- FIRST-PERSON TRANQUILIZER RIFLE ----------
-const gun=new THREE.Group();camera.add(gun);const gunMat=mat(0x343a34,{metalness:.35,roughness:.65});
-const gunBody=new THREE.Mesh(new THREE.BoxGeometry(.2,.17,.65),gunMat);gunBody.position.set(.35,-.3,-.65);gun.add(gunBody);
-const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,.5,8),gunMat);barrel.rotation.x=Math.PI/2;barrel.position.set(.35,-.25,-.98);gun.add(barrel);
-const dartMat=mat(0xc2d89e,{emissive:0x4d5d32});
-
-// ---------- MULTIPLAYER ----------
-async function joinRoom(){
-  if(!user)return;playerName=$('playerName').value.trim()||user.user_metadata?.username||'Ranger';room=($('roomCode').value.trim().toUpperCase()||'FOREST').replace(/[^A-Z0-9_-]/g,'').slice(0,12);
-  $('lobbyMessage').textContent='Connecting to Blackpine...';
-  channel=supabase.channel('forest-'+room,{config:{broadcast:{self:false},presence:{key:user.id}}});
-  channel.on('presence',{event:'sync'},updatePresence)
-    .on('broadcast',{event:'move'},({payload})=>{if(payload?.id&&payload.id!==user.id)remotePositions[payload.id]=payload;})
-    .on('broadcast',{event:'capture'},({payload})=>handleCapture(payload))
-    .on('broadcast',{event:'round_end'},({payload})=>endRound(payload?.winner));
-  const status=await new Promise(resolve=>channel.subscribe(s=>resolve(s)));
-  if(status!=='SUBSCRIBED'){$('lobbyMessage').textContent='Could not connect. Check your internet and try again.';return;}
-  joinedAt=Date.now();await channel.track({id:user.id,name:playerName,joined:joinedAt,x:camera.position.x,z:camera.position.z,rot:yaw,caught:false});
-  gameStarted=true;$('lobby').classList.add('hidden');$('hud').classList.remove('hidden');$('roomDisplay').textContent=room;$('sanityName').textContent=playerName.toUpperCase()+' SANITY';
-  const mobile=matchMedia('(pointer: coarse)').matches;$('mobileControls').classList.toggle('hidden',!mobile);$('controls').textContent=mobile?'LEFT STICK MOVE · DRAG RIGHT TO LOOK · FIRE':'WASD MOVE · SHIFT SPRINT · CLICK FIRE · ESC UNLOCK';
-  if(!mobile)renderer.domElement.requestPointerLock?.();setTimeout(updatePresence,400);
+function openLobby() {
+  $("auth").classList.add("hidden");
+  $("lobby").classList.remove("hidden");
+  say("welcome", "Logged in as " + user.email);
 }
-$('play').onclick=joinRoom;
-function updatePresence(){if(!channel||!user)return;const state=channel.presenceState(),all=[];for(const list of Object.values(state)){for(const p of list){if(p.id&&!all.some(v=>v.id===p.id))all.push(p);}}all.sort((a,b)=>(a.joined||0)-(b.joined||0));const hunter=all[0];if(!hunter)return;
-  myRole=hunter.id===user.id?'hunter':'deer';$('role').textContent=myRole==='hunter'?'HUNTER':'SKINWALKER DEER';$('objective').textContent=myRole==='hunter'?'Find the deer that does not belong.':'Blend in. Survive the hunt.';$('playerCount').textContent=all.length+(all.length===1?' PLAYER':' PLAYERS');
+
+// ===========================================
+// MULTIPLAYER ROOMS
+// ===========================================
+
+function newCode() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+$("createRoom").onclick = () => enterRoom(newCode());
+
+$("joinRoom").onclick = () => {
+  const code = $("roomCode").value.trim().toUpperCase();
+
+  if (code.length < 4) {
+    say("lobbyMessage", "Enter a room code.");
+    return;
+  }
+
+  enterRoom(code);
+};
+
+async function enterRoom(code) {
+  if (!user) return;
+
+  if (channel) await supabase.removeChannel(channel);
+
+  room = code;
+  joinedAt = Date.now();
+
+  say("lobbyMessage", "Connecting...");
+
+  channel = supabase.channel("hunt-" + room, {
+    config: {
+      presence: { key: user.id },
+      broadcast: { self: false }
+    }
+  });
+
+  channel
+    .on("presence", { event: "sync" }, assignRoles)
+    .on("presence", { event: "join" }, assignRoles)
+    .on("presence", { event: "leave" }, assignRoles)
+    .on("broadcast", { event: "position" }, ({ payload }) => {
+      const player = players.get(payload.id);
+      if (player) {
+        player.mesh.position.set(payload.x, 0, payload.z);
+      }
+    })
+    .on("broadcast", { event: "captured" }, ({ payload }) => {
+      if (payload.id === user.id) {
+        notify("YOU HAVE BEEN CAPTURED");
+        setTimeout(leaveGame, 1500);
+      }
+    });
+
+  channel.subscribe(async status => {
+    if (status === "SUBSCRIBED") {
+      await channel.track({
+        id: user.id,
+        joinedAt,
+        x: 0,
+        z: 0
+      });
+
+      $("lobby").classList.add("hidden");
+      $("gameScreen").classList.remove("hidden");
+
+      say("roomLabel", "ROOM: " + room);
+      say("lobbyMessage", "");
+
+      await startGame();
+    } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+      say("lobbyMessage", "Connection failed. Check Supabase Realtime.");
+    }
+  });
+}
+
+function assignRoles() {
+  const people = Object.values(channel.presenceState()).flat();
+  people.sort((a, b) => a.joinedAt - b.joinedAt);
+
+  role = people[0]?.id === user.id ? "hunter" : "skinwalker";
+
+  say("roleLabel", "ROLE: " + role.toUpperCase());
+  say(
+    "objective",
+    role === "hunter"
+      ? "Capture the disguised skinwalkers."
+      : "Blend in with the deer. Avoid the hunter."
+  );
+
+  const ids = new Set();
+
+  for (const person of people) {
+    if (person.id === user.id) continue;
+
+    ids.add(person.id);
+
+    if (!players.has(person.id)) {
+      const mesh = createDeer();
+      scene?.add(mesh);
+      players.set(person.id, { mesh });
+    }
+  }
+
+  for (const [id, player] of players) {
+    if (!ids.has(id)) {
+      scene?.remove(player.mesh);
+      players.delete(id);
+    }
+  }
+}
+
+// ===========================================
+// MODEL LOADING
+// ===========================================
+
+async function loadModel(path) {
+  const gltf = await loader.loadAsync(path);
+  return gltf.scene;
+}
+
+function fitModel(model, height) {
+  const bounds = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3();
+  bounds.getSize(size);
+
+  const factor = height / Math.max(size.y, 0.001);
+  model.scale.multiplyScalar(factor);
+  model.updateMatrixWorld(true);
+
+  const scaled = new THREE.Box3().setFromObject(model);
+  model.position.y -= scaled.min.y;
+
+  model.traverse(object => {
+    if (object.isMesh) {
+      object.castShadow = true;
+      object.receiveShadow = true;
+    }
+  });
+
+  return model;
+}
+
+async function loadAssets() {
+  const results = await Promise.allSettled([
+    loadModel(ASSETS.forest),
+    loadModel(ASSETS.deer),
+    loadModel(ASSETS.wendigo)
+  ]);
+
+  if (results[0].status === "fulfilled") {
+    const forest = results[0].value;
+    forest.scale.setScalar(1);
+
+    forest.traverse(object => {
+      if (object.isMesh) {
+        object.castShadow = true;
+        object.receiveShadow = true;
+      }
+    });
+
+    scene.add(forest);
+  } else {
+    console.error("Forest failed to load:", results[0].reason);
+    makeGround();
+  }
+
+  if (results[1].status === "fulfilled") {
+    deerTemplate = fitModel(results[1].value, 1.7);
+    console.log("Real deer model loaded.");
+  } else {
+    console.error("Deer model failed to load:", results[1].reason);
+  }
+
+  if (results[2].status === "fulfilled") {
+    wendigoTemplate = fitModel(results[2].value, 3.5);
+    console.log("Wendigo model loaded.");
+  } else {
+    console.error("Wendigo model failed to load:", results[2].reason);
+  }
+}
+
+// ===========================================
+// THREE.JS WORLD
+// ===========================================
+
+async function startGame() {
+  if (running) return;
+
+  running = true;
+  sanity = 100;
+  sanityTimer = 0;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x111a14);
+  scene.fog = new THREE.FogExp2(0x111a14, 0.012);
+
+  camera = new THREE.PerspectiveCamera(
+    75,
+    innerWidth / innerHeight,
+    0.1,
+    1000
+  );
+
+  camera.position.set(0, 1.7, 0);
+  camera.rotation.order = "YXZ";
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+
+  $("world").replaceChildren(renderer.domElement);
+
+  clock = new THREE.Clock();
+
+  scene.add(new THREE.HemisphereLight(0xa9bda8, 0x10140d, 1.1));
+
+  const moon = new THREE.DirectionalLight(0xc3d2cf, 1.3);
+  moon.position.set(-30, 50, 20);
+  moon.castShadow = true;
+  scene.add(moon);
+
+  try {
+    await loadAssets();
+  } catch (error) {
+    console.error(error);
+  }
+
+  createAnimals();
+
+  renderer.domElement.addEventListener("click", () => {
+    if (matchMedia("(pointer:fine)").matches) {
+      renderer.domElement.requestPointerLock?.();
+    }
+  });
+
+  renderer.domElement.addEventListener("pointerdown", event => {
+    if (event.pointerType === "touch") {
+      lookTouchStart = { x: event.clientX, y: event.clientY };
+    }
+  });
+
+  renderer.domElement.addEventListener("pointermove", event => {
+    if (event.pointerType !== "touch" || !lookTouchStart) return;
+
+    yaw -= (event.clientX - lookTouchStart.x) * 0.005;
+    pitch -= (event.clientY - lookTouchStart.y) * 0.005;
+    pitch = THREE.MathUtils.clamp(pitch, -1.4, 1.4);
+
+    lookTouchStart = { x: event.clientX, y: event.clientY };
+  });
+
+  renderer.domElement.addEventListener("pointerup", () => {
+    lookTouchStart = null;
+  });
+
+  document.addEventListener("mousemove", mouseLook);
+  window.addEventListener("keydown", e => keys[e.code] = true);
+  window.addEventListener("keyup", e => keys[e.code] = false);
+  window.addEventListener("resize", resize);
+
+  setupJoystick();
+  updateSanity();
+  animate();
+}
+
+let lookTouchStart = null;
+
+function makeGround() {
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(500, 500),
+    new THREE.MeshStandardMaterial({ color: 0x18271a })
+  );
+
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.1;
+  ground.receiveShadow = true;
+  scene.add(ground);
+}
+
+// ===========================================
+// DEER AND SKINWALKER MODELS
+// ===========================================
+
+function createDeer() {
+  if (deerTemplate) {
+    const deer = deerTemplate.clone(true);
+    deer.userData.isDeer = true;
+    return deer;
+  }
+
+  const fallback = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(.65, .65, 1.25),
+    new THREE.MeshStandardMaterial({ color: 0x70513a })
+  );
+
+  body.position.y = .95;
+  fallback.add(body);
+  fallback.userData.isDeer = true;
+  return fallback;
+}
+
+function createAnimals() {
+  for (let i = 0; i < 8; i++) {
+    const mesh = createDeer();
+
+    mesh.position.set(
+      (Math.random() - .5) * 80,
+      0,
+      (Math.random() - .5) * 80
+    );
+
+    scene.add(mesh);
+
+    animals.push({
+      mesh,
+      direction: Math.random() * Math.PI * 2,
+      timer: Math.random() * 4
+    });
+  }
+}
+
+function updateAnimals(delta) {
+  for (const animal of animals) {
+    animal.timer -= delta;
+
+    if (animal.timer <= 0) {
+      animal.direction += (Math.random() - .5) * 2;
+      animal.timer = 2 + Math.random() * 4;
+    }
+
+    animal.mesh.position.x += Math.sin(animal.direction) * delta;
+    animal.mesh.position.z += Math.cos(animal.direction) * delta;
+    animal.mesh.rotation.y = animal.direction;
+  }
+}
+
+// ===========================================
+// CAMERA AND MOVEMENT
+// ===========================================
+
+function mouseLook(event) {
+  if (document.pointerLockElement !== renderer?.domElement) return;
+
+  yaw -= event.movementX * .002;
+  pitch -= event.movementY * .002;
+  pitch = THREE.MathUtils.clamp(pitch, -1.4, 1.4);
+}
+
+function movePlayer(delta) {
+  let x = 0;
+  let z = 0;
+
+  if (keys.KeyW) z -= 1;
+  if (keys.KeyS) z += 1;
+  if (keys.KeyA) x -= 1;
+  if (keys.KeyD) x += 1;
+
+  x += mobileMove.x;
+  z += mobileMove.y;
+
+  const length = Math.hypot(x, z);
+
+  if (length > 1) {
+    x /= length;
+    z /= length;
+  }
+
+  const speed = 7 * delta;
+  const sin = Math.sin(yaw);
+  const cos = Math.cos(yaw);
+
+  camera.position.x += (x * cos - z * sin) * speed;
+  camera.position.z += (z * cos + x * sin) * speed;
+  camera.position.y = 1.7;
+
+  camera.rotation.set(pitch, yaw, 0, "YXZ");
+}
+
+// ===========================================
+// MOBILE CONTROLS
+// ===========================================
+
+function setupJoystick() {
+  const joystick = $("joystick");
+  const stick = $("stick");
+
+  let active = false;
+
+  joystick.addEventListener("pointerdown", event => {
+    active = true;
+    joystick.setPointerCapture(event.pointerId);
+    updateStick(event);
+  });
+
+  joystick.addEventListener("pointermove", event => {
+    if (active) updateStick(event);
+  });
+
+  function updateStick(event) {
+    const rect = joystick.getBoundingClientRect();
+    let dx = event.clientX - (rect.left + rect.width / 2);
+    let dy = event.clientY - (rect.top + rect.height / 2);
+
+    const length = Math.hypot(dx, dy);
+    const max = 38;
+
+    if (length > max) {
+      dx = dx / length * max;
+      dy = dy / length * max;
+    }
+
+    stick.style.transform = `translate(${dx}px,${dy}px)`;
+    mobileMove.x = dx / max;
+    mobileMove.y = dy / max;
+  }
+
+  function release() {
+    active = false;
+    mobileMove = { x: 0, y: 0 };
+    stick.style.transform = "translate(0,0)";
+  }
+
+  joystick.addEventListener("pointerup", release);
+  joystick.addEventListener("pointercancel", release);
+
+  $("fireButton").addEventListener("pointerdown", event => {
+    event.preventDefault();
+    fire();
+  });
+}
+
+// ===========================================
+// TRANQUILIZER GUN
+// ===========================================
+
+function fire() {
+  if (!running || role !== "hunter") return;
+
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+  raycaster.far = 35;
+
+  const targets = [];
+
+  for (const [id, player] of players) {
+    player.mesh.userData.playerId = id;
+    targets.push(player.mesh);
+  }
+
+  for (const animal of animals) {
+    targets.push(animal.mesh);
+  }
+
+  const hits = raycaster.intersectObjects(targets, true);
+
+  if (!hits.length) {
+    notify("MISSED");
+    return;
+  }
+
+  let target = hits[0].object;
+
+  while (target && !target.userData.playerId && !target.userData.isDeer) {
+    target = target.parent;
+  }
+
+  if (!target) return;
+
+  if (target.userData.playerId) {
+    channel.send({
+      type: "broadcast",
+      event: "captured",
+      payload: { id: target.userData.playerId }
+    });
+
+    sanity = Math.min(100, sanity + 20);
+    notify("SKINWALKER CAPTURED");
+  } else if (target.userData.isDeer) {
+    target.visible = false;
+    sanity = Math.max(0, sanity - 20);
+    notify("WRONG TARGET");
+  }
+
+  updateSanity();
+}
+
+document.addEventListener("mousedown", event => {
+  if (
+    event.button === 0 &&
+    running &&
+    document.pointerLockElement === renderer?.domElement
+  ) {
+    fire();
+  }
+});
+
+// ===========================================
+// SANITY AND WENDIGO
+// ===========================================
+
+function updateSanity() {
+  $("sanityFill").style.width = sanity + "%";
+  $("sanityNumber").textContent = Math.round(sanity) + "%";
+
+  $("sanityFill").style.background =
+    sanity < 30 ? "#a33c32" : "#a3b58e";
+
+  if (sanity <= 0 && role === "hunter") transformIntoWendigo();
+}
+
+function transformIntoWendigo() {
+  if (role === "wendigo") return;
+
+  role = "wendigo";
+
+  say("roleLabel", "ROLE: WENDIGO");
+  say("objective", "HUNT EVERYONE IN THE FOREST.");
+  notify("YOU ARE NO LONGER HUMAN");
+
+  scene.background = new THREE.Color(0x170605);
+  scene.fog = new THREE.FogExp2(0x170605, .035);
+
+  if (wendigoTemplate) {
+    wendigoInstance = wendigoTemplate.clone(true);
+    scene.add(wendigoInstance);
+  }
+}
+
+function updateWendigo() {
+  if (!wendigoInstance) return;
+
+  wendigoInstance.position.set(
+    camera.position.x,
+    0,
+    camera.position.z - 3
+  );
+
+  wendigoInstance.rotation.y = yaw + Math.PI;
+}
+
+// ===========================================
+// GAME LOOP
+// ===========================================
+
+function animate() {
+  if (!running) return;
+
+  requestAnimationFrame(animate);
+
+  const delta = Math.min(clock.getDelta(), .05);
+
+  movePlayer(delta);
+  updateAnimals(delta);
+  updateWendigo();
+
+  if (role === "hunter") {
+    sanityTimer += delta;
+
+    if (sanityTimer >= 5) {
+      sanityTimer = 0;
+      sanity = Math.max(0, sanity - 1);
+      updateSanity();
+    }
+  }
+
+  for (const player of players.values()) {
+    // Position is updated from multiplayer messages.
+    player.mesh.position.y = 0;
+  }
+
+  if (channel && Date.now() - lastSend > 100) {
+    lastSend = Date.now();
+
+    channel.send({
+      type: "broadcast",
+      event: "position",
+      payload: {
+        id: user.id,
+        x: camera.position.x,
+        z: camera.position.z
+      }
+    });
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ===========================================
+// CLEANUP
+// ===========================================
+
+function resize() {
+  if (!camera || !renderer) return;
+
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+
+$("leave").onclick = leaveGame;
+
+async function leaveGame() {
+  running = false;
+
+  if (channel) {
+    await supabase.removeChannel(channel);
+    channel = null;
+  }
+
+  document.exitPointerLock?.();
+
+  document.removeEventListener("mousemove", mouseLook);
+  document.removeEventListener("mousedown", fire);
+
+  if (renderer) {
+    renderer.dispose();
+    renderer.domElement.remove();
+  }
+
+  players.clear();
+  animals.length = 0;
+
+  scene = null;
+  camera = null;
+  renderer = null;
+
+  $("gameScreen").classList.add("hidden");
+  $("lobby").classList.remove("hidden");
+  say("message", "");
+}
+unt.';$('playerCount').textContent=all.length+(all.length===1?' PLAYER':' PLAYERS');
   for(const p of all){if(p.id===user.id)continue;if(!remoteModels[p.id]){const model=createDeer();scene.add(model);remoteModels[p.id]=model;}if(p.x!==undefined)remotePositions[p.id]=p;}
   for(const id of Object.keys(remoteModels)){if(!all.some(p=>p.id===id)){scene.remove(remoteModels[id]);delete remoteModels[id];delete remotePositions[id];}}
 }
