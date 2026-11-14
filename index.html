@@ -1,61 +1,73 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <meta name="theme-color" content="#0b100d">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Skinwalker: The Hunt</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="game"></div>
 
-  <section id="login" class="screen">
-    <div class="auth-card">
-      <div class="eyebrow"><span class="live-dot"></span> BLACKPINE COUNTY <span>• INCIDENT 007</span></div>
-      <div class="brand-mark">S/H</div>
-      <h1>SKINWALKER<span>THE HUNT</span></h1>
-      <p class="subtitle">Something is wearing the shape of a deer.</p>
-      <div class="field"><label for="email">EMAIL ADDRESS</label><input id="email" type="email" autocomplete="email" placeholder="you@example.com"></div>
-      <div class="field"><label for="password">PASSWORD</label><input id="password" type="password" autocomplete="current-password" placeholder="At least 6 characters"></div>
-      <button id="signin" class="primary">ENTER THE FOREST <span>↗</span></button>
-      <button id="signup" class="text-button">NEW HERE? CREATE AN ACCOUNT</button>
-      <p id="authMessage" class="feedback" aria-live="polite"></p>
-      <div class="auth-foot">FIELD ACCESS ONLY · BLACKPINE RESEARCH DIVISION</div>
+  <section id="auth" class="screen">
+    <div class="panel">
+      <div class="eyebrow">NIGHTFALL STUDIOS</div>
+      <h1>SKINWALKER<br><span>THE HUNT</span></h1>
+      <p>Something is watching from the trees.</p>
+
+      <input id="email" type="email" placeholder="Email">
+      <input id="password" type="password" placeholder="Password">
+
+      <button id="login">LOG IN</button>
+      <button id="signup" class="secondary">CREATE ACCOUNT</button>
+      <div id="authMessage" class="message"></div>
     </div>
   </section>
 
   <section id="lobby" class="screen hidden">
-    <div class="auth-card lobby-card">
-      <div class="eyebrow"><span class="live-dot"></span> BLACKPINE COUNTY</div>
-      <h2>THE <span>HUNT</span></h2>
-      <p class="subtitle">Join a field operation. Keep your radio close.</p>
-      <div class="field"><label for="playerName">CALLSIGN</label><input id="playerName" maxlength="16" placeholder="Ranger"></div>
-      <div class="field"><label for="roomCode">ROOM CODE</label><input id="roomCode" maxlength="12" value="FOREST" autocapitalize="characters"></div>
-      <button id="play" class="primary">ENTER FOREST <span>↗</span></button>
-      <button id="logout" class="text-button">SIGN OUT</button>
-      <p id="lobbyMessage" class="feedback" aria-live="polite"></p>
+    <div class="panel">
+      <div class="eyebrow">MULTIPLAYER SURVIVAL</div>
+      <h1>ENTER THE FOREST</h1>
+      <p id="welcome"></p>
+
+      <button id="createRoom">CREATE ROOM</button>
+      <input id="roomCode" placeholder="ROOM CODE" maxlength="8">
+      <button id="joinRoom" class="secondary">JOIN ROOM</button>
+      <button id="logout" class="quiet">LOG OUT</button>
+      <div id="lobbyMessage" class="message"></div>
     </div>
   </section>
 
-  <div id="hud" class="hidden">
-    <div class="topbar"><span id="role">HUNTER</span><span id="roomDisplay">FOREST</span><span id="playerCount">1 PLAYER</span></div>
-    <div class="sanity"><div class="sanityText"><span id="sanityName">RANGER SANITY</span><b id="sanityNumber">100%</b></div><div class="sanityTrack"><div id="sanityFill"></div></div></div>
-    <div id="objective">Find the deer that doesn't belong.</div>
+  <main id="gameScreen" class="hidden">
+    <div id="world"></div>
+
+    <div class="hud">
+      <div class="brand">SKINWALKER <span>THE HUNT</span></div>
+      <div id="roomLabel">ROOM: ----</div>
+      <div id="roleLabel">ROLE: WAITING</div>
+    </div>
+
+    <div class="sanity">
+      <div>SANITY</div>
+      <div class="bar"><div id="sanityFill"></div></div>
+      <span id="sanityNumber">100%</span>
+    </div>
+
     <div id="crosshair">+</div>
-    <div id="weapon">TRANQUILIZER RIFLE · ∞</div>
     <div id="message"></div>
-    <div id="controls">WASD MOVE · SHIFT SPRINT · CLICK FIRE</div>
-  </div>
 
-  <div id="mobileControls" class="hidden">
-    <div id="joystick" class="joystick"><div id="stick" class="stick"></div></div>
-    <div class="mobile-right"><button id="fireTouch" class="fire-touch">FIRE</button><div class="look-hint">DRAG TO LOOK</div></div>
-  </div>
+    <div class="bottomHUD">
+      <div id="objective">Find the others.</div>
+      <small>WASD MOVE · MOUSE LOOK · CLICK FIRE</small>
+    </div>
 
-  <section id="result" class="screen hidden">
-    <div class="auth-card"><div class="eyebrow">BLACKPINE COUNTY · REPORT</div><h2 id="resultTitle">THE HUNT</h2><p id="resultMessage"></p><button id="returnMenu" class="primary">RETURN TO MENU ↗</button></div>
-  </section>
+    <div id="mobileControls">
+      <div id="joystick"><div id="stick"></div></div>
+      <button id="fireButton">FIRE</button>
+    </div>
+
+    <button id="leave">LEAVE MATCH</button>
+  </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script type="module" src="game.js"></script>
