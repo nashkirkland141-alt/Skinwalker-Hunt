@@ -5,8 +5,8 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 // SUPABASE CONFIGURATION
 // ==========================================
 
-const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
-const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://twsyqidzbgwidjnffhfb.supabase.co";
+const SUPABASE_KEY = "sb_publishable_jkNeW0TBQTZ8VcEAudYAbw_xOt5ZVuQ";
 
 const supabase = window.supabase.createClient(
   SUPABASE_URL,
