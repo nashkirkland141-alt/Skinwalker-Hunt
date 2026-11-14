@@ -3,73 +3,398 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Skinwalker: The Hunt</title>
-  <link rel="stylesheet" href="style.css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #080b08;
+      color: #e8e8df;
+      font-family: Inter, sans-serif;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    button, input {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    #game {
+      position: fixed;
+      inset: 0;
+      display: none;
+    }
+
+    #menu {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background:
+        linear-gradient(90deg, rgba(0,0,0,.92), rgba(0,0,0,.55)),
+        radial-gradient(ellipse at center, #243023, #080b08 75%);
+    }
+
+    .menu-card {
+      width: min(440px, 100%);
+      padding: 32px;
+      background: rgba(12,17,12,.94);
+      border: 1px solid #394739;
+      border-radius: 8px;
+      box-shadow: 0 20px 80px #000;
+    }
+
+    .eyebrow {
+      color: #9aab8c;
+      letter-spacing: 4px;
+      font-size: 10px;
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-family: "Special Elite", serif;
+      font-size: clamp(34px, 8vw, 54px);
+      line-height: .95;
+      color: #e6e5d8;
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      color: #929b8c;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .field {
+      width: 100%;
+      background: #090d09;
+      border: 1px solid #354235;
+      color: white;
+      padding: 14px;
+      margin-bottom: 10px;
+      outline: none;
+      border-radius: 4px;
+    }
+
+    .field:focus {
+      border-color: #91a47e;
+    }
+
+    .main-button {
+      width: 100%;
+      border: 1px solid #738766;
+      background: #647958;
+      color: white;
+      padding: 14px;
+      border-radius: 4px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      margin-top: 8px;
+    }
+
+    .main-button:hover {
+      background: #7d936e;
+    }
+
+    .secondary-button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 8px;
+      background: transparent;
+      color: #aeb8a7;
+      border: 1px solid #354235;
+      border-radius: 4px;
+    }
+
+    .secondary-button:hover {
+      background: #182018;
+    }
+
+    .role-row {
+      display: flex;
+      gap: 10px;
+      margin: 14px 0;
+    }
+
+    .role-button {
+      flex: 1;
+      padding: 12px 5px;
+      background: #111811;
+      color: #aab4a4;
+      border: 1px solid #344034;
+      border-radius: 4px;
+    }
+
+    .role-button.selected {
+      border-color: #a3b98e;
+      color: white;
+      background: #273426;
+    }
+
+    #status {
+      min-height: 20px;
+      margin-top: 14px;
+      font-size: 12px;
+      color: #b7c49f;
+      line-height: 1.5;
+    }
+
+    #hud {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      display: none;
+    }
+
+    #top-left {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      background: rgba(0,0,0,.55);
+      padding: 12px 15px;
+      border-left: 3px solid #899b76;
+    }
+
+    #room-label {
+      font-size: 11px;
+      color: #a7b99a;
+      letter-spacing: 2px;
+    }
+
+    #role-label {
+      font-weight: 900;
+      font-size: 15px;
+      margin-top: 4px;
+    }
+
+    #sanity-panel {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      width: 160px;
+      background: rgba(0,0,0,.6);
+      padding: 12px;
+    }
+
+    .hud-caption {
+      color: #b7c0ad;
+      font-size: 10px;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+
+    #sanity-bar {
+      height: 7px;
+      background: #343b31;
+      overflow: hidden;
+    }
+
+    #sanity-fill {
+      height: 100%;
+      width: 100%;
+      background: #a6b78a;
+      transition: width .3s;
+    }
+
+    #hint {
+      position: absolute;
+      bottom: 25px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      font-size: 12px;
+      text-shadow: 0 2px 5px black;
+      text-align: center;
+      width: 90%;
+    }
+
+    #crosshair {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 8px;
+      height: 8px;
+      border: 1px solid rgba(255,255,255,.8);
+      border-radius: 50%;
+      transform: translate(-50%,-50%);
+    }
+
+    #mobile-controls {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    #joystick {
+      position: absolute;
+      bottom: 35px;
+      left: 25px;
+      width: 120px;
+      height: 120px;
+      border: 2px solid rgba(255,255,255,.25);
+      background: rgba(0,0,0,.25);
+      border-radius: 50%;
+      pointer-events: auto;
+    }
+
+    #stick {
+      position: absolute;
+      width: 48px;
+      height: 48px;
+      left: 34px;
+      top: 34px;
+      border-radius: 50%;
+      background: rgba(190,205,175,.6);
+      border: 1px solid #d4e0c7;
+    }
+
+    #fire-button {
+      position: absolute;
+      right: 28px;
+      bottom: 48px;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(130,35,25,.75);
+      color: white;
+      border: 2px solid #b87568;
+      pointer-events: auto;
+      font-weight: 900;
+    }
+
+    #exit-button {
+      position: absolute;
+      top: 18px;
+      right: 190px;
+      pointer-events: auto;
+      background: rgba(0,0,0,.65);
+      border: 1px solid #596453;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 3px;
+    }
+
+    #blackout {
+      position: fixed;
+      inset: 0;
+      background: black;
+      z-index: 20;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1s;
+    }
+
+    #blackout.active {
+      opacity: 1;
+    }
+
+    @media (max-width: 700px) {
+      #mobile-controls {
+        display: block;
+      }
+
+      #exit-button {
+        top: 100px;
+        right: 18px;
+      }
+
+      #sanity-panel {
+        width: 125px;
+      }
+    }
+  </style>
 </head>
+
 <body>
 
-  <section id="auth" class="screen">
-    <div class="panel">
-      <div class="eyebrow">NIGHTFALL STUDIOS</div>
-      <h1>SKINWALKER<br><span>THE HUNT</span></h1>
-      <p>Something is watching from the trees.</p>
+  <div id="menu">
+    <div class="menu-card">
+      <div class="eyebrow">NORTH WOODS • 1998</div>
+      <h1>SKINWALKER<br>THE HUNT</h1>
+      <p class="subtitle">
+        Something is moving between the trees.
+        Don't trust what you see.
+      </p>
 
-      <input id="email" type="email" placeholder="Email">
-      <input id="password" type="password" placeholder="Password">
+      <div id="auth-area">
+        <input id="email" class="field" type="email" placeholder="Email address" autocomplete="email">
+        <input id="password" class="field" type="password" placeholder="Password" autocomplete="current-password">
 
-      <button id="login">LOG IN</button>
-      <button id="signup" class="secondary">CREATE ACCOUNT</button>
-      <div id="authMessage" class="message"></div>
+        <button id="login-button" class="main-button">SIGN IN</button>
+        <button id="signup-button" class="secondary-button">CREATE ACCOUNT</button>
+      </div>
+
+      <div id="lobby-area" style="display:none">
+        <p id="welcome" class="subtitle"></p>
+
+        <input id="room-code" class="field" maxlength="8" placeholder="ROOM CODE (optional)">
+
+        <div class="role-row">
+          <button class="role-button selected" id="hunter-role">HUNTER</button>
+          <button class="role-button" id="deer-role">DEER</button>
+        </div>
+
+        <button id="start-button" class="main-button">ENTER THE FOREST</button>
+        <button id="logout-button" class="secondary-button">SIGN OUT</button>
+      </div>
+
+      <div id="status"></div>
     </div>
-  </section>
+  </div>
 
-  <section id="lobby" class="screen hidden">
-    <div class="panel">
-      <div class="eyebrow">MULTIPLAYER SURVIVAL</div>
-      <h1>ENTER THE FOREST</h1>
-      <p id="welcome"></p>
+  <div id="game"></div>
 
-      <button id="createRoom">CREATE ROOM</button>
-      <input id="roomCode" placeholder="ROOM CODE" maxlength="8">
-      <button id="joinRoom" class="secondary">JOIN ROOM</button>
-      <button id="logout" class="quiet">LOG OUT</button>
-      <div id="lobbyMessage" class="message"></div>
-    </div>
-  </section>
-
-  <main id="gameScreen" class="hidden">
-    <div id="world"></div>
-
-    <div class="hud">
-      <div class="brand">SKINWALKER <span>THE HUNT</span></div>
-      <div id="roomLabel">ROOM: ----</div>
-      <div id="roleLabel">ROLE: WAITING</div>
-    </div>
-
-    <div class="sanity">
-      <div>SANITY</div>
-      <div class="bar"><div id="sanityFill"></div></div>
-      <span id="sanityNumber">100%</span>
-    </div>
-
-    <div id="crosshair">+</div>
-    <div id="message"></div>
-
-    <div class="bottomHUD">
-      <div id="objective">Find the others.</div>
-      <small>WASD MOVE · MOUSE LOOK · CLICK FIRE</small>
+  <div id="hud">
+    <div id="top-left">
+      <div id="room-label">ROOM: ----</div>
+      <div id="role-label">HUNTER</div>
     </div>
 
-    <div id="mobileControls">
-      <div id="joystick"><div id="stick"></div></div>
-      <button id="fireButton">FIRE</button>
+    <div id="sanity-panel">
+      <div class="hud-caption">MENTAL STATE</div>
+      <div id="sanity-bar">
+        <div id="sanity-fill"></div>
+      </div>
     </div>
 
-    <button id="leave">LEAVE MATCH</button>
-  </main>
+    <div id="crosshair"></div>
+    <div id="hint">WASD to move • Mouse to look • Click to fire</div>
+    <button id="exit-button">LEAVE GAME</button>
+  </div>
+
+  <div id="mobile-controls">
+    <div id="joystick">
+      <div id="stick"></div>
+    </div>
+    <button id="fire-button">FIRE</button>
+  </div>
+
+  <div id="blackout"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script type="module" src="game.js"></script>
+  <script src="./config.js"></script>
+  <script type="module" src="./game.js"></script>
+
 </body>
 </html>
